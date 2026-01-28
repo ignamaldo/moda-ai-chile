@@ -259,8 +259,8 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
                                 className={`px-8 py-3 rounded-xl text-sm font-black transition-all duration-300 ${activeTab === tab
-                                        ? 'bg-gray-900 text-white shadow-lg'
-                                        : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'
+                                    ? 'bg-gray-900 text-white shadow-lg'
+                                    : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'
                                     }`}
                             >
                                 {tab}
@@ -490,8 +490,8 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                                 type="submit"
                                 disabled={isSubmitting || !newProduct.image}
                                 className={`w-full py-6 rounded-[2rem] font-black text-sm uppercase tracking-widest transition-all duration-500 flex items-center justify-center gap-3 ${newProduct.image
-                                        ? 'bg-gray-900 text-white shadow-2xl shadow-gray-200 hover:scale-[1.02] active:scale-95'
-                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    ? 'bg-gray-900 text-white shadow-2xl shadow-gray-200 hover:scale-[1.02] active:scale-95'
+                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                     }`}
                             >
                                 <span>{isSubmitting ? 'Publicando...' : 'Publicar Producto'}</span>
