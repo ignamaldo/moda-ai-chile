@@ -1,5 +1,8 @@
 import React, { useState, useRef } from 'react';
+import { addDoc, collection, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import {
+    CheckCircle,
+    X,
     Edit,
     Plus,
     Image as ImageIcon,
@@ -16,7 +19,6 @@ import {
     Loader2,
     ArrowRight
 } from 'lucide-react';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { GEMINI_API_KEY } from '../firebaseConfig';
 
 const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
@@ -29,9 +31,8 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
     const [category, setCategory] = useState('Ropa');
     const [description, setDescription] = useState('');
     const [imageFile, setImageFile] = useState(null);
-    const [aiImageFile, setAiImageFile] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+    const [toasts, setToasts] = useState([]);
     const fileInputRef = useRef(null);
 
     const tabs = [
@@ -80,34 +81,30 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
             reader.onloadend = async () => {
                 const compressed = await compressImage(reader.result);
                 setImageFile(compressed);
-                setAiImageFile(null); // Reset AI image if original changes
             };
             reader.readAsDataURL(file);
         }
     };
 
-    const handleGenerateAI = async () => {
-        if (!imageFile || !description) {
-            alert("Sube una foto y escribe una descripción primero.");
-            return;
-        }
+    const addToast = (message, type = 'success') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+        }, 5000);
+    };
 
-        setIsGeneratingAI(true);
+    const processAIGeneration = async (docId, productName, productDesc, base64Image) => {
         const apiKey = GEMINI_API_KEY;
-
-        if (!apiKey || apiKey === "TU_GEMINI_API_KEY_AQUI") {
-            alert("Falta configurar la GEMINI_API_KEY en firebaseConfig.js");
-            setIsGeneratingAI(false);
-            return;
-        }
+        if (!apiKey || apiKey === "TU_GEMINI_API_KEY_AQUI") return;
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-        const base64Data = imageFile.split(',')[1];
+        const base64DataData = base64Image.split(',')[1];
 
         const prompt = `Actúa como un fotógrafo de alta costura para una revista de élite (como Vogue o Harper's Bazaar).
   OBJETIVO: Crear una imagen publicitaria de nivel editorial donde una modelo de alta costura viste el artículo de moda adjunto.
   
-  ARTÍCULO A RESALTAR: ${name} - ${description}.
+  ARTÍCULO A RESALTAR: ${productName} - ${productDesc}.
   
   DETALLES DE LA COMPOSICIÓN:
   - ESCENA: Un entorno minimalista y sofisticado (estudio profesional con iluminación 'chiaroscuro' o un fondo arquitectónico moderno y limpio).
@@ -120,7 +117,7 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
             contents: [{
                 parts: [
                     { text: prompt },
-                    { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+                    { inlineData: { mimeType: "image/jpeg", data: base64DataData } }
                 ]
             }]
         };
@@ -132,50 +129,50 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                 body: JSON.stringify(payload)
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error("Gemini Error Detail:", errorData);
-                throw new Error(errorData.error?.message || 'Error al conectar con la IA de Google');
-            }
+            if (!response.ok) throw new Error("Error en Gemini");
 
             const data = await response.json();
             const aiBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
 
             if (aiBase64) {
-                setAiImageFile(`data:image/jpeg;base64,${aiBase64}`);
-            } else {
-                throw new Error("La IA no generó una imagen. Prueba con una descripción más corta.");
+                const aiUrl = `data:image/jpeg;base64,${aiBase64}`;
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', docId), {
+                    aiImageUrl: aiUrl
+                });
+                addToast(`Sesión Editorial lista para "${productName}" ✨`);
             }
         } catch (error) {
-            console.error("Error IA:", error);
-            alert(`Error IA: ${error.message}`);
-        } finally {
-            setIsGeneratingAI(false);
+            console.error("Background AI Error:", error);
+            addToast(`Error al generar IA para "${productName}"`, 'error');
         }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!user) return;
+        if (!user || !imageFile) return;
         setIsSubmitting(true);
         try {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+            const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
                 name,
                 price: Number(price),
                 category,
                 description,
-                imageUrl: imageFile || "",
-                aiImageUrl: aiImageFile || null,
+                imageUrl: imageFile,
+                aiImageUrl: null,
                 createdAt: serverTimestamp(),
                 createdBy: user.uid
             });
-            setName(''); setPrice(''); setDescription(''); setImageFile(null); setAiImageFile(null);
+
+            // Trigger AI in background
+            processAIGeneration(docRef.id, name, description, imageFile);
+
+            setName(''); setPrice(''); setDescription(''); setImageFile(null);
             if (fileInputRef.current) fileInputRef.current.value = "";
-            alert("Producto publicado con éxito.");
             setSubTab('Lista');
+            addToast("Producto publicado. Generando IA en segundo plano...");
         } catch (error) {
             console.error(error);
-            alert("Error al publicar.");
+            addToast("Error al publicar el producto.", "error");
         } finally {
             setIsSubmitting(false);
         }
@@ -363,62 +360,20 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                                     <textarea required value={description} onChange={e => setDescription(e.target.value)} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white outline-none font-medium text-gray-600 h-28 resize-none" placeholder="Describe materiales y estilo para que la IA pose con este producto..." />
                                 </div>
 
-                                <div className="p-6 bg-purple-50/50 border border-purple-100 rounded-3xl space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Wand2 className="text-purple-600" size={18} />
-                                            <h4 className="font-black text-xs uppercase text-purple-900">AI Editorial Studio</h4>
-                                        </div>
-                                        {aiImageFile && <span className="text-[10px] font-black text-green-600 uppercase">Listo ✅</span>}
-                                    </div>
-                                    <p className="text-[11px] text-purple-700/70 font-medium">Automatiza tu sesión de fotos. La IA creará una modelo profesional luciendo tu prenda automáticamente.</p>
-                                    <button
-                                        type="button"
-                                        onClick={handleGenerateAI}
-                                        disabled={!imageFile || isGeneratingAI}
-                                        className="w-full py-3 bg-white border-2 border-purple-200 text-purple-600 rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all disabled:opacity-30 active:scale-95 shadow-sm"
-                                    >
-                                        {isGeneratingAI ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-                                        {isGeneratingAI ? 'Fotografiando...' : (aiImageFile ? 'Regenerar Foto IA' : 'Generar Sesión Editorial IA')}
-                                    </button>
-                                </div>
                             </div>
 
                             <div className="flex flex-col gap-6">
-                                <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Multimedia del Producto</label>
-                                <div className="grid grid-cols-2 gap-4 h-full min-h-[300px]">
-                                    <div className="border-2 border-dashed border-gray-100 rounded-[2rem] bg-gray-50 flex flex-col items-center justify-center relative group overflow-hidden">
-                                        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                                        {imageFile ? (
-                                            <img src={imageFile} className="w-full h-full object-cover rounded-2xl" />
-                                        ) : (
-                                            <div className="text-center px-4">
-                                                <ImageIcon className="text-gray-300 mx-auto mb-2" size={24} />
-                                                <p className="font-bold text-[10px] text-gray-500 uppercase leading-tight">Cargar Foto<br />Original</p>
-                                            </div>
-                                        )}
-                                        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[8px] font-black uppercase shadow-sm">Producto</div>
-                                    </div>
-
-                                    <div className="border-2 border-dashed border-purple-100 rounded-[2rem] bg-purple-50/20 flex flex-col items-center justify-center relative overflow-hidden">
-                                        {aiImageFile ? (
-                                            <img src={aiImageFile} className="w-full h-full object-cover rounded-2xl animate-in zoom-in duration-500" />
-                                        ) : (
-                                            <div className="text-center px-4">
-                                                <Wand2 className="text-purple-200 mx-auto mb-2" size={24} />
-                                                <p className="font-bold text-[10px] text-purple-300 uppercase leading-tight">Resultado<br />IA Editorial</p>
-                                            </div>
-                                        )}
-                                        {isGeneratingAI && (
-                                            <div className="absolute inset-0 bg-purple-50/60 backdrop-blur-[1px] flex items-center justify-center">
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <Loader2 className="animate-spin text-purple-600" size={24} />
-                                                    <span className="text-[8px] font-black text-purple-600 uppercase animate-pulse">Generando...</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div className="absolute top-4 left-4 bg-purple-600 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase flex items-center gap-1 shadow-lg shadow-purple-200">Editorial <Sparkles size={8} /></div>
-                                    </div>
+                                <div className="border-2 border-dashed border-gray-100 rounded-[2rem] bg-gray-50 flex flex-col items-center justify-center relative group overflow-hidden min-h-[400px]">
+                                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                                    {imageFile ? (
+                                        <img src={imageFile} className="w-full h-full object-cover rounded-2xl" />
+                                    ) : (
+                                        <div className="text-center px-4">
+                                            <ImageIcon className="text-gray-300 mx-auto mb-2" size={32} />
+                                            <p className="font-bold text-xs text-gray-500 uppercase leading-tight">Cargar Foto del Producto</p>
+                                            <p className="text-[10px] text-gray-400 mt-2">La IA generará la sesión editorial automáticamente al publicar.</p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button type="submit" disabled={isSubmitting || !imageFile} className="w-full bg-black text-white py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 mt-auto flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-50">
@@ -435,6 +390,19 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                         <h3 className="text-2xl font-black text-gray-900">Módulo en Desarrollo</h3>
                     </div>
                 )}
+            </div>
+            {/* Toast Notifications */}
+            <div className="fixed bottom-10 right-10 z-[100] flex flex-col gap-3">
+                {toasts.map(toast => (
+                    <div
+                        key={toast.id}
+                        className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in slide-in-from-right-10 duration-500 ${toast.type === 'error' ? 'bg-red-50/90 border-red-100 text-red-600' : 'bg-white/90 border-gray-100 text-gray-900'
+                            }`}
+                    >
+                        {toast.type === 'error' ? <X size={18} /> : <CheckCircle size={18} className="text-green-500" />}
+                        <span className="text-sm font-bold">{toast.message}</span>
+                    </div>
+                ))}
             </div>
         </div>
     );
