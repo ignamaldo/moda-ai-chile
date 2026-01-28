@@ -110,7 +110,7 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
         }
 
         console.log(`🎨 Starting AI generation for "${productName}"...`);
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
         const base64Data = base64Image.split(',')[1];
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', docId);
 
