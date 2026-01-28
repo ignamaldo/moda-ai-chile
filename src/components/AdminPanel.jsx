@@ -104,6 +104,66 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
         }
     };
 
+    const handleGenerateDemoData = async () => {
+        if (!user) return;
+        setIsSubmitting(true);
+        try {
+            const demoProducts = [
+                {
+                    name: "Abrigo Camel Luxury",
+                    price: 89990,
+                    category: "Ropa",
+                    description: "Abrigo de lana premium color camel, corte elegante.",
+                    imageUrl: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?q=80&w=400&h=400&auto=format&fit=crop"
+                },
+                {
+                    name: "Botas Cuero Italiano",
+                    price: 125990,
+                    category: "Zapatos",
+                    description: "Botas de cuero genuino hechas a mano en Italia.",
+                    imageUrl: "https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=400&h=400&auto=format&fit=crop"
+                },
+                {
+                    name: "Bolso Minimal Negro",
+                    price: 45000,
+                    category: "Accesorios",
+                    description: "Bolso de hombro de cuero sintético de alta calidad.",
+                    imageUrl: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=400&h=400&auto=format&fit=crop"
+                }
+            ];
+
+            // Add products
+            for (const prod of demoProducts) {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+                    ...prod,
+                    createdAt: serverTimestamp(),
+                    createdBy: user.uid
+                });
+            }
+
+            // Create some fictitious sales (stored in a 'sales' collection for future modules)
+            const demoSales = [
+                { amount: 89990, date: serverTimestamp(), product: "Abrigo Camel" },
+                { amount: 45000, date: serverTimestamp(), product: "Bolso Minimal" }
+            ];
+
+            for (const sale of demoSales) {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'sales'), {
+                    ...sale,
+                    createdBy: user.uid
+                });
+            }
+
+            alert("Datos demo generados con éxito. Revisa el inventario.");
+            setSubTab('Lista');
+        } catch (error) {
+            console.error(error);
+            alert("Error al generar datos demo.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     return (
         <div className="bg-[#FBFCFE] min-h-[600px] rounded-[2rem] border border-gray-100 shadow-2xl overflow-hidden flex flex-col font-sans mb-20 animate-in fade-in zoom-in duration-500">
             {/* ERP Navigation Header */}
@@ -149,10 +209,14 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="bg-purple-50 text-purple-700 px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2">
+                    <button
+                        onClick={handleGenerateDemoData}
+                        disabled={isSubmitting}
+                        className="bg-purple-600 text-white px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 active:scale-95 disabled:opacity-50"
+                    >
                         <Database size={14} />
-                        Demo Mode
-                    </div>
+                        {isSubmitting ? 'Generando...' : 'Generar Datos Demo'}
+                    </button>
                 </div>
             </div>
 
