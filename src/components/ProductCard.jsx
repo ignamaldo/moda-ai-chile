@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, Trash2 } from 'lucide-react';
+import { ShoppingBag, Trash2, Wand2, Sparkles } from 'lucide-react';
 
 const ProductCard = ({ product, onAddCart, isAdmin, onDelete, formatCLP }) => {
     // For Admin: Show anything available
