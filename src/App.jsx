@@ -26,7 +26,6 @@ import { firebaseConfig } from './firebaseConfig';
 
 // Components
 import ProductCard from './components/ProductCard';
-import AIModal from './components/AIModal';
 import CheckoutModal from './components/CheckoutModal';
 import AdminPanel from './components/AdminPanel';
 
@@ -48,7 +47,6 @@ export default function App() {
     const [products, setProducts] = useState([]);
     const [cart, setCart] = useState([]);
     const [isAdminMode, setIsAdminMode] = useState(false); // Toggle para simular vistas
-    const [selectedProductForAI, setSelectedProductForAI] = useState(null);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
 
@@ -262,7 +260,6 @@ export default function App() {
                                 product={product}
                                 isAdmin={isAdminMode}
                                 onAddCart={addToCart}
-                                onTryOn={setSelectedProductForAI}
                                 onDelete={deleteProduct}
                                 formatCLP={formatCLP}
                             />
@@ -316,11 +313,6 @@ export default function App() {
             )}
 
             {/* Modals */}
-            <AIModal
-                isOpen={!!selectedProductForAI}
-                onClose={() => setSelectedProductForAI(null)}
-                product={selectedProductForAI}
-            />
 
             <CheckoutModal
                 isOpen={isCheckoutOpen}

@@ -1,40 +1,57 @@
 import React from 'react';
 import { ShoppingBag, Trash2, Wand2 } from 'lucide-react';
 
-const ProductCard = ({ product, onAddCart, onTryOn, isAdmin, onDelete, formatCLP }) => (
+const ProductCard = ({ product, onAddCart, isAdmin, onDelete, formatCLP }) => (
     <div className="bg-white rounded-[2rem] shadow-sm hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 border border-gray-100/50 flex flex-col h-full group overflow-hidden">
         <div className="relative h-80 overflow-hidden bg-gray-50">
+            {/* Main Image (AI Editorial if exists, else Original) */}
             <img
-                src={product.imageUrl || "https://via.placeholder.com/400x400?text=Sin+Imagen"}
+                src={(product.aiImageUrl || product.imageUrl) || "https://via.placeholder.com/400x400?text=Sin+Imagen"}
                 alt={product.name}
-                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                className={`w-full h-full object-cover transition-all duration-700 ${product.aiImageUrl ? 'group-hover:opacity-0 group-hover:scale-105' : 'group-hover:scale-110'}`}
             />
 
-            {/* Glassmorphism Category Badge */}
-            <div className="absolute top-4 left-4 bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/40 shadow-sm transition-all group-hover:bg-white/60">
-                <span className="text-[10px] font-extrabold text-gray-800 uppercase tracking-widest">{product.category || 'Destacado'}</span>
+            {/* Hover Image (Original if AI exists) */}
+            {product.aiImageUrl && (
+                <img
+                    src={product.imageUrl}
+                    alt={`${product.name} original`}
+                    className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-all duration-700 scale-105 group-hover:scale-100"
+                />
+            )}
+
+            {/* Badges */}
+            <div className="absolute top-4 left-4 flex flex-col gap-2">
+                <div className="bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/40 shadow-sm transition-all group-hover:bg-white/60">
+                    <span className="text-[10px] font-extrabold text-gray-800 uppercase tracking-widest">{product.category || 'Destacado'}</span>
+                </div>
+                {product.aiImageUrl && (
+                    <div className="bg-purple-600/80 backdrop-blur-md px-3 py-1 rounded-2xl border border-purple-400/40 shadow-lg flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 duration-500">
+                        <Sparkles size={10} className="text-white" />
+                        <span className="text-[8px] font-black text-white uppercase tracking-tighter">Editorial IA</span>
+                    </div>
+                )}
             </div>
 
             {isAdmin && (
                 <button
                     onClick={() => onDelete(product.id)}
-                    className="absolute top-4 right-4 bg-white/20 hover:bg-red-500 text-gray-800 hover:text-white p-2.5 rounded-2xl shadow-lg backdrop-blur-md border border-white/40 transition-all duration-300"
+                    className="absolute top-4 right-4 bg-white/20 hover:bg-red-500 text-gray-800 hover:text-white p-2.5 rounded-2xl shadow-lg backdrop-blur-md border border-white/40 transition-all duration-300 z-20"
                 >
                     <Trash2 size={16} />
                 </button>
             )}
 
-            {/* AI Try-on Button with custom gradient */}
-            <button
-                onClick={() => onTryOn(product)}
-                className="absolute bottom-4 left-4 right-4 bg-gradient-to-r from-purple-600 to-indigo-600 backdrop-blur-md text-white px-5 py-3.5 rounded-[1.25rem] text-sm font-black flex items-center justify-center gap-2 shadow-xl shadow-purple-500/30 transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500 ease-out z-10"
-            >
-                <div className="bg-white/20 p-1 rounded-lg">
-                    <Wand2 size={14} className="animate-pulse" />
+            {/* Tooltip on hover */}
+            {product.aiImageUrl && (
+                <div className="absolute bottom-4 left-0 right-0 text-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    <span className="bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">
+                        Vista: Producto Real
+                    </span>
                 </div>
-                Probar con IA
-            </button>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            )}
+
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         </div>
 
         <div className="p-6 flex flex-col flex-grow bg-white relative">
