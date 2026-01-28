@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShoppingBag, Trash2, Wand2, Sparkles } from 'lucide-react';
 
-const ProductCard = ({ product, onAddCart, isAdmin, onDelete, formatCLP }) => {
+const ProductCard = ({ product, onAddCart, isAdmin, onDelete, onClick, formatCLP }) => {
     // Check if AI images exist
     const hasAnyAI = product.aiImageUrl || product.aiProductUrl;
     const hasBothAI = product.aiImageUrl && product.aiProductUrl;
@@ -20,7 +20,10 @@ const ProductCard = ({ product, onAddCart, isAdmin, onDelete, formatCLP }) => {
 
 
     return (
-        <div className="bg-white rounded-[2rem] shadow-sm hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 border border-gray-100/50 flex flex-col h-full group overflow-hidden">
+        <div
+            onClick={onClick}
+            className={`bg-white rounded-[2rem] shadow-sm hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 border border-gray-100/50 flex flex-col h-full group overflow-hidden ${onClick ? 'cursor-pointer' : ''}`}
+        >
             <div className="relative h-80 overflow-hidden bg-gray-50 text-center">
                 {/* Image Layer: Primary */}
                 {primaryImage ? (

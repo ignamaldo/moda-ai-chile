@@ -28,6 +28,7 @@ import { firebaseConfig } from './firebaseConfig';
 import ProductCard from './components/ProductCard';
 import CheckoutModal from './components/CheckoutModal';
 import AdminPanel from './components/AdminPanel';
+import ProductDetailModal from './components/ProductDetailModal';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -49,6 +50,7 @@ export default function App() {
     const [isAdminMode, setIsAdminMode] = useState(false); // Toggle para simular vistas
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null); // For product detail modal
 
     const [isLoadingProducts, setIsLoadingProducts] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -274,6 +276,7 @@ export default function App() {
                                     isAdmin={isAdminMode}
                                     onAddCart={addToCart}
                                     onDelete={deleteProduct}
+                                    onClick={() => !isAdminMode && setSelectedProduct(product)}
                                     formatCLP={formatCLP}
                                 />
                             ))}
@@ -333,6 +336,14 @@ export default function App() {
                 total={cartTotal}
                 cart={cart}
                 clearCart={() => setCart([])}
+                formatCLP={formatCLP}
+            />
+
+            <ProductDetailModal
+                product={selectedProduct}
+                isOpen={!!selectedProduct}
+                onClose={() => setSelectedProduct(null)}
+                onAddToCart={addToCart}
                 formatCLP={formatCLP}
             />
 
