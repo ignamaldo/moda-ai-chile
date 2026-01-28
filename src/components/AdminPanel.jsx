@@ -30,6 +30,7 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isGeneratingDemo, setIsGeneratingDemo] = useState(false);
     const [toasts, setToasts] = useState([]);
+    const fileInputRef = useRef(null);
 
     const [newProduct, setNewProduct] = useState({
         name: '',
@@ -464,16 +465,19 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                         </section>
 
                         <section className="space-y-8">
-                            <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[400px] relative group overflow-hidden transition-all hover:border-purple-200">
+                            <div
+                                onClick={() => fileInputRef.current?.click()}
+                                className="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[400px] relative group overflow-hidden transition-all hover:border-purple-200 cursor-pointer"
+                            >
                                 {newProduct.image ? (
                                     <>
                                         <img src={newProduct.image} alt="Preview" className="w-full h-full object-cover rounded-2xl absolute inset-0" />
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
-                                            <label className="cursor-pointer bg-white text-gray-900 px-6 py-3 rounded-xl font-black text-sm shadow-xl">Cambiar Foto</label>
+                                            <div className="bg-white text-gray-900 px-6 py-3 rounded-xl font-black text-sm shadow-xl">Cambiar Foto</div>
                                         </div>
                                     </>
                                 ) : (
-                                    <label className="cursor-pointer flex flex-col items-center gap-4 group/label">
+                                    <div className="flex flex-col items-center gap-4 group/label">
                                         <div className="p-6 bg-gray-50 rounded-[2rem] group-hover/label:bg-purple-50 transition-colors">
                                             <ImageIcon size={48} className="text-gray-300 group-hover/label:text-purple-400 transition-colors" />
                                         </div>
@@ -481,9 +485,15 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                                             <p className="font-black text-gray-900 tracking-tighter uppercase text-sm">Cargar Foto del Producto</p>
                                             <p className="text-[10px] text-gray-400 font-medium">La IA generará la sesión editorial automáticamente al publicar.</p>
                                         </div>
-                                    </label>
+                                    </div>
                                 )}
-                                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleImageChange}
+                                />
                             </div>
 
                             <button
