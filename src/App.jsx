@@ -51,6 +51,7 @@ export default function App() {
     const [isCartOpen, setIsCartOpen] = useState(false);
 
     const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+    const [selectedCategory, setSelectedCategory] = useState('Todos');
 
     // Auth
     useEffect(() => {
@@ -222,9 +223,13 @@ export default function App() {
                         <h2 className="text-3xl font-black text-gray-900 tracking-tight">Colección 2026</h2>
                         <p className="text-gray-400 text-sm font-medium mt-1">Explora nuestras piezas seleccionadas</p>
                     </div>
-                    <div className="flex bg-gray-100 p-1.5 rounded-2xl gap-1">
-                        {['Todos', 'Ropa', 'Accesorios', 'Zapatos'].map(cat => (
-                            <button key={cat} className={`px-5 py-2 rounded-[0.9rem] text-xs font-black transition-all duration-300 uppercase tracking-wider ${cat === 'Todos' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
+                    <div className="flex bg-gray-100 p-1.5 rounded-2xl gap-1 overflow-x-auto">
+                        {['Todos', 'Ropa', 'Accesorios', 'Zapatos', 'Carteras', 'Mochilas', 'Poleras', 'Polerones'].map(cat => (
+                            <button
+                                key={cat}
+                                onClick={() => setSelectedCategory(cat)}
+                                className={`px-5 py-2 rounded-[0.9rem] text-xs font-black transition-all duration-300 uppercase tracking-wider whitespace-nowrap ${selectedCategory === cat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                            >
                                 {cat}
                             </button>
                         ))}
@@ -254,16 +259,18 @@ export default function App() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 animate-in fade-in slide-in-from-bottom-5 duration-1000">
-                        {products.map(product => (
-                            <ProductCard
-                                key={product.id}
-                                product={product}
-                                isAdmin={isAdminMode}
-                                onAddCart={addToCart}
-                                onDelete={deleteProduct}
-                                formatCLP={formatCLP}
-                            />
-                        ))}
+                        {products
+                            .filter(p => selectedCategory === 'Todos' || p.category === selectedCategory)
+                            .map(product => (
+                                <ProductCard
+                                    key={product.id}
+                                    product={product}
+                                    isAdmin={isAdminMode}
+                                    onAddCart={addToCart}
+                                    onDelete={deleteProduct}
+                                    formatCLP={formatCLP}
+                                />
+                            ))}
                     </div>
                 )}
             </main>

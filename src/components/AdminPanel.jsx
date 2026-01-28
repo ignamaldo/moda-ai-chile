@@ -17,74 +17,31 @@ import {
     Wand2,
     Sparkles,
     Loader2,
-    ArrowRight
+    ArrowRight,
+    Package,
+    AlertCircle,
+    Trash2,
+    ShoppingBag
 } from 'lucide-react';
 import { GEMINI_API_KEY } from '../firebaseConfig';
 
 const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
-    const [activeTab, setActiveTab] = useState('Inventario');
-    const [subTab, setSubTab] = useState('Lista'); // 'Lista' o 'Crear'
-
-    // Form State
-    const [name, setName] = useState('');
-    const [price, setPrice] = useState('');
-    const [category, setCategory] = useState('Ropa');
-    const [description, setDescription] = useState('');
-    const [imageFile, setImageFile] = useState(null);
+    const [activeTab, setActiveTab] = useState('Dashboard'); // 'Dashboard', 'Lista', 'Crear'
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isGeneratingDemo, setIsGeneratingDemo] = useState(false);
     const [toasts, setToasts] = useState([]);
-    const fileInputRef = useRef(null);
 
-    const tabs = [
-        { id: 'Inventario', icon: LayoutGrid },
-        { id: 'Costos', icon: DollarSign },
-        { id: 'Reservas', icon: Calendar },
-        { id: 'Clientes', icon: Users },
-        { id: 'Estadísticas', icon: BarChart3 },
-        { id: 'Impuestos', icon: Calculator },
-    ];
+    const [newProduct, setNewProduct] = useState({
+        name: '',
+        price: '',
+        cost: '',
+        stock: '1',
+        category: 'Ropa',
+        description: '',
+        image: null
+    });
 
-    const compressImage = (base64Str, maxWidth = 1024, maxHeight = 1024) => {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.src = base64Str;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height) {
-                    if (width > maxWidth) {
-                        height *= maxWidth / width;
-                        width = maxWidth;
-                    }
-                } else {
-                    if (height > maxHeight) {
-                        width *= maxHeight / height;
-                        height = maxHeight;
-                    }
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                resolve(canvas.toDataURL('image/jpeg', 0.8)); // Calidad un poco mayor para Gemini
-            };
-        });
-    };
-
-    const handleImageChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const compressed = await compressImage(reader.result);
-                setImageFile(compressed);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
+    const categories = ['Ropa', 'Accesorios', 'Zapatos', 'Carteras', 'Mochilas', 'Poleras', 'Polerones'];
 
     const addToast = (message, type = 'success') => {
         const id = Date.now();
@@ -92,6 +49,54 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
         setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== id));
         }, 5000);
+    };
+
+    const compressImage = (file, maxWidth = 1024, maxHeight = 1024) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.8));
+                };
+                img.onerror = (error) => reject(error);
+            };
+            reader.onerror = (error) => reject(error);
+        });
+    };
+
+    const handleImageChange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const compressed = await compressImage(file);
+                setNewProduct(prev => ({ ...prev, image: compressed }));
+            } catch (err) {
+                addToast("Error al procesar la imagen", "error");
+            }
+        }
     };
 
     const processAIGeneration = async (docId, productName, productDesc, base64Image) => {
@@ -124,7 +129,7 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
 
             if (resModel.ok) {
                 const data = await resModel.json();
-                const aiBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                const aiBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                 if (aiBase64) {
                     await updateDoc(docRef, { aiImageUrl: `data:image/jpeg;base64,${aiBase64}` });
                     addToast(`Diseño con Modelo listo para "${productName}" 👗`);
@@ -154,7 +159,7 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
 
             if (resProd.ok) {
                 const data = await resProd.json();
-                const aiBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                const aiBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                 if (aiBase64) {
                     await updateDoc(docRef, { aiProductUrl: `data:image/jpeg;base64,${aiBase64}` });
                     addToast(`Foto de Producto (Alta Calidad) lista para "${productName}" 📸`);
@@ -165,30 +170,33 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!user || !imageFile) return;
+        if (!user || !newProduct.image) return;
         setIsSubmitting(true);
         try {
-            const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
-                name,
-                price: Number(price),
-                category,
-                description,
-                imageUrl: imageFile,
+            const productData = {
+                name: newProduct.name,
+                price: parseFloat(newProduct.price),
+                cost: parseFloat(newProduct.cost || 0),
+                stock: parseInt(newProduct.stock || 0),
+                category: newProduct.category,
+                description: newProduct.description,
+                imageUrl: newProduct.image,
                 aiImageUrl: null,
+                aiProductUrl: null,
                 createdAt: serverTimestamp(),
                 createdBy: user.uid
-            });
+            };
 
-            // Trigger AI in background
-            processAIGeneration(docRef.id, name, description, imageFile);
+            const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), productData);
 
-            setName(''); setPrice(''); setDescription(''); setImageFile(null);
-            if (fileInputRef.current) fileInputRef.current.value = "";
-            setSubTab('Lista');
-            addToast("Producto publicado. Generando IA en segundo plano...");
+            addToast("Producto publicado con éxito 🚀");
+            processAIGeneration(docRef.id, newProduct.name, newProduct.description, newProduct.image);
+
+            setNewProduct({ name: '', price: '', cost: '', stock: '1', category: 'Ropa', description: '', image: null });
+            setActiveTab('Lista');
         } catch (error) {
             console.error(error);
-            addToast("Error al publicar el producto.", "error");
+            addToast("Error al publicar producto", "error");
         } finally {
             setIsSubmitting(false);
         }
@@ -196,151 +204,176 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
 
     const handleGenerateDemoData = async () => {
         if (!user) return;
-        setIsSubmitting(true);
+        setIsGeneratingDemo(true);
         try {
             const demoProducts = [
-                {
-                    name: "Abrigo Camel Luxury",
-                    price: 89990,
-                    category: "Ropa",
-                    description: "Abrigo de lana premium color camel, corte elegante.",
-                    imageUrl: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?q=80&w=400&h=400&auto=format&fit=crop",
-                    aiImageUrl: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?q=80&w=400&h=400&auto=format&fit=crop"
-                },
-                {
-                    name: "Botas Cuero Italiano",
-                    price: 125990,
-                    category: "Zapatos",
-                    description: "Botas de cuero genuino hechas a mano en Italia.",
-                    imageUrl: "https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=400&h=400&auto=format&fit=crop",
-                    aiImageUrl: "https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=400&h=400&auto=format&fit=crop"
-                }
+                { name: "Abrigo Velvet Night", price: 125000, cost: 55000, stock: 12, category: "Ropa", description: "Terciopelo negro con forro de seda.", imageUrl: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=800" },
+                { name: "Bolso Minimal Ivory", price: 89000, cost: 32000, stock: 8, category: "Carteras", description: "Cuero vegano color marfil.", imageUrl: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800" },
+                { name: "Botín Urban Craft", price: 95000, cost: 41000, stock: 15, category: "Zapatos", description: "Cuero genuino hecho a mano.", imageUrl: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=800" }
             ];
 
             for (const prod of demoProducts) {
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
                     ...prod,
+                    aiImageUrl: null,
+                    aiProductUrl: null,
                     createdAt: serverTimestamp(),
                     createdBy: user.uid
                 });
             }
-
-            alert("Datos demo generados con éxito.");
-            setSubTab('Lista');
+            addToast("Datos demo generados correctamente");
         } catch (error) {
             console.error(error);
-            alert("Error al generar datos demo.");
+            addToast("Error al generar datos demo", "error");
         } finally {
-            setIsSubmitting(false);
+            setIsGeneratingDemo(false);
         }
     };
 
     return (
-        <div className="bg-[#FBFCFE] min-h-[600px] rounded-[2rem] border border-gray-100 shadow-2xl overflow-hidden flex flex-col font-sans mb-20 animate-in fade-in zoom-in duration-500">
-            {/* ERP Navigation Header */}
-            <div className="bg-white border-b border-gray-100 px-8 py-2 overflow-x-auto">
-                <div className="flex items-center gap-8 min-w-max">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon;
-                        const isActive = activeTab === tab.id;
-                        return (
+        <div className="flex-1 overflow-auto p-4 md:p-8 bg-[#F8F9FC] relative">
+            {/* Toast System */}
+            <div className="fixed bottom-8 right-8 z-[100] flex flex-col gap-3">
+                {toasts.map(toast => (
+                    <div
+                        key={toast.id}
+                        className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in fade-in slide-in-from-right-10 duration-500 ${toast.type === 'error' ? 'bg-red-50/90 border-red-200 text-red-800' : 'bg-white/90 border-gray-100 text-gray-800'
+                            }`}
+                    >
+                        {toast.type === 'error' ? <AlertCircle size={20} className="text-red-500" /> : <CheckCircle size={20} className="text-purple-500" />}
+                        <span className="font-bold text-sm">{toast.message}</span>
+                    </div>
+                ))}
+            </div>
+
+            <div className="max-w-7xl mx-auto">
+                <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                    <div>
+                        <h1 className="text-4xl font-black text-gray-900 tracking-tighter mb-2">MODA AI ERP</h1>
+                        <p className="text-gray-500 font-medium">Gestión inteligente de inventario y marketing IA</p>
+                    </div>
+
+                    <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100">
+                        {['Dashboard', 'Lista', 'Crear'].map((tab) => (
                             <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2.5 py-4 px-2 border-b-2 transition-all duration-300 ${isActive
-                                    ? 'border-black text-black'
-                                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`px-8 py-3 rounded-xl text-sm font-black transition-all duration-300 ${activeTab === tab
+                                        ? 'bg-gray-900 text-white shadow-lg'
+                                        : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'
                                     }`}
                             >
-                                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
-                                <span className={`text-[13px] tracking-tight ${isActive ? 'font-black' : 'font-medium'}`}>
-                                    {tab.id}
-                                </span>
+                                {tab}
                             </button>
-                        );
-                    })}
-                </div>
-            </div>
+                        ))}
+                    </div>
+                </header>
 
-            {/* Sub-navigation */}
-            <div className="px-8 py-6 bg-white border-b border-gray-50 flex items-center justify-between">
-                <div className="flex bg-gray-50 p-1.5 rounded-2xl gap-1">
-                    <button
-                        onClick={() => setSubTab('Crear')}
-                        className={`px-6 py-2 rounded-[0.9rem] text-[13px] font-bold flex items-center gap-2 transition-all ${subTab === 'Crear' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                        <Plus size={16} /> Crear
-                    </button>
-                    <button
-                        onClick={() => setSubTab('Lista')}
-                        className={`px-6 py-2 rounded-[0.9rem] text-[13px] font-bold flex items-center gap-2 transition-all ${subTab === 'Lista' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                        <List size={16} /> Lista
-                    </button>
-                </div>
+                {activeTab === 'Dashboard' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4">Total Productos</span>
+                            <div className="flex items-end gap-3">
+                                <span className="text-5xl font-black text-gray-900 tracking-tighter">{products.length}</span>
+                                <Package className="text-purple-500 mb-2" size={24} />
+                            </div>
+                        </div>
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4">Valor Inventario</span>
+                            <div className="flex items-end gap-3">
+                                <span className="text-3xl font-black text-gray-900 tracking-tighter">
+                                    {formatCLP(products.reduce((acc, p) => acc + (p.price * (p.stock || 1)), 0))}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4">Stock Crítico</span>
+                            <div className="flex items-end gap-3">
+                                <span className="text-5xl font-black text-red-500 tracking-tighter">
+                                    {products.filter(p => (p.stock || 0) < 5).length}
+                                </span>
+                                <AlertCircle className="text-red-500 mb-2" size={24} />
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleGenerateDemoData}
+                            disabled={isGeneratingDemo}
+                            className="bg-purple-600 p-8 rounded-[2.5rem] shadow-lg shadow-purple-200 text-left hover:bg-purple-700 transition-all group overflow-hidden relative"
+                        >
+                            <div className="relative z-10">
+                                <span className="text-[10px] font-black text-purple-200 uppercase tracking-widest block mb-4">Herramientas</span>
+                                <span className="text-2xl font-black text-white tracking-tighter leading-none block">
+                                    {isGeneratingDemo ? 'Generando...' : 'Poblar Datos Demo'}
+                                </span>
+                            </div>
+                            <Sparkles className="absolute -bottom-4 -right-4 text-purple-400/30 group-hover:scale-150 transition-transform duration-700" size={120} />
+                        </button>
+                    </div>
+                )}
 
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleGenerateDemoData}
-                        disabled={isSubmitting}
-                        className="bg-purple-600 text-white px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 active:scale-95 disabled:opacity-50"
-                    >
-                        <Database size={14} />
-                        {isSubmitting ? 'Generando...' : 'Generar Datos Demo'}
-                    </button>
-                </div>
-            </div>
-
-            {/* Content Area */}
-            <div className="flex-1 p-8 overflow-y-auto">
-                {activeTab === 'Inventario' ? (
-                    subTab === 'Lista' ? (
-                        <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
-                            <table className="w-full text-left">
-                                <thead className="bg-gray-50/50 border-b border-gray-100">
-                                    <tr>
-                                        <th className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400">Producto</th>
-                                        <th className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400">Estado IA</th>
-                                        <th className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400">Precio</th>
-                                        <th className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400 text-right">Acciones</th>
+                {activeTab === 'Lista' && (
+                    <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Producto</th>
+                                        <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Categoría</th>
+                                        <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Costo</th>
+                                        <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Precio Venta</th>
+                                        <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock</th>
+                                        <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Marketing IA</th>
+                                        <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
                                     {products.length === 0 ? (
                                         <tr>
-                                            <td colSpan="4" className="px-8 py-20 text-center text-gray-300 font-medium">No hay productos en inventario</td>
+                                            <td colSpan="7" className="px-8 py-20 text-center text-gray-300 font-medium">No hay productos en inventario</td>
                                         </tr>
                                     ) : (
-                                        products.map(product => (
-                                            <tr key={product.id} className="hover:bg-gray-50/50 transition-colors group">
-                                                <td className="px-8 py-5">
+                                        products.map((p) => (
+                                            <tr key={p.id} className="hover:bg-gray-50/50 transition-colors group">
+                                                <td className="px-8 py-6">
                                                     <div className="flex items-center gap-4">
-                                                        <div className="relative">
-                                                            <img src={product.imageUrl} className="w-12 h-12 rounded-xl object-cover bg-gray-50" />
-                                                            {product.aiImageUrl && <div className="absolute -bottom-1 -right-1 bg-purple-600 text-white p-0.5 rounded-md border-2 border-white"><Sparkles size={8} /></div>}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold text-sm text-gray-900">{product.name}</p>
-                                                            <p className="text-[10px] text-gray-400 font-medium">{product.category}</p>
-                                                        </div>
+                                                        <img src={p.imageUrl} alt="" className="w-12 h-12 rounded-xl object-cover border border-gray-100" />
+                                                        <span className="font-bold text-gray-900">{p.name}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-8 py-5">
-                                                    {product.aiImageUrl ? (
-                                                        <span className="bg-purple-50 text-purple-600 px-3 py-1 rounded-full text-[11px] font-black flex items-center gap-1.5 w-max uppercase tracking-tighter">
-                                                            Editorial IA <Sparkles size={10} />
-                                                        </span>
-                                                    ) : (
-                                                        <span className="bg-gray-50 text-gray-400 px-3 py-1 rounded-full text-[11px] font-black w-max uppercase tracking-tighter">Original Only</span>
-                                                    )}
+                                                <td className="px-8 py-6">
+                                                    <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tight">{p.category}</span>
                                                 </td>
-                                                <td className="px-8 py-5 font-bold text-sm text-gray-700">{formatCLP(product.price)}</td>
-                                                <td className="px-8 py-5 text-right">
+                                                <td className="px-8 py-6 font-medium text-gray-500">{formatCLP(p.cost || 0)}</td>
+                                                <td className="px-8 py-6 font-black text-gray-900">{formatCLP(p.price)}</td>
+                                                <td className="px-8 py-6">
+                                                    <span className={`font-black ${(p.stock || 0) < 5 ? 'text-red-500' : 'text-gray-900'}`}>
+                                                        {p.stock || 0} u.
+                                                    </span>
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <div className="flex gap-2">
+                                                        {p.aiImageUrl ? (
+                                                            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600" title="Modelo IA lista">
+                                                                <CheckCircle size={14} />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 animate-pulse" title="Generando...">
+                                                                <Sparkles size={14} />
+                                                            </div>
+                                                        )}
+                                                        {p.aiProductUrl && (
+                                                            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600" title="Foto Producto IA lista">
+                                                                <CheckCircle size={14} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6 text-right">
                                                     <button
-                                                        onClick={() => onDelete(product.id)}
-                                                        className="text-gray-300 hover:text-red-500 transition-colors p-2"
+                                                        onClick={() => onDelete(p.id)}
+                                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
                                                     >
-                                                        <Plus size={18} className="rotate-45" />
+                                                        <Trash2 size={18} />
                                                     </button>
                                                 </td>
                                             </tr>
@@ -349,76 +382,124 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                                 </tbody>
                             </table>
                         </div>
-                    ) : (
-                        /* Form View (Crear) */
-                        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-6xl mx-auto py-4">
-                            <div className="space-y-6">
+                    </div>
+                )}
+
+                {activeTab === 'Crear' && (
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <section className="space-y-8">
+                            <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100 space-y-6">
                                 <div className="space-y-2">
-                                    <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Nombre del Producto</label>
-                                    <input required value={name} onChange={e => setName(e.target.value)} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white outline-none font-bold text-gray-700" placeholder="Ej: Abrigo Velvet Night" />
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre del Producto</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Ej: Abrigo Velvet Night"
+                                        className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-purple-500/20 font-medium transition-all"
+                                        value={newProduct.name}
+                                        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                                    />
                                 </div>
+
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Precio</label>
-                                        <input type="number" required value={price} onChange={e => setPrice(e.target.value)} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white outline-none font-bold text-gray-700" placeholder="0" />
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Precio Venta</label>
+                                        <input
+                                            required
+                                            type="number"
+                                            className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-purple-500/20 font-black transition-all"
+                                            value={newProduct.price}
+                                            onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                                        />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Categoría</label>
-                                        <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white outline-none font-bold text-gray-700 appearance-none">
-                                            <option>Ropa</option>
-                                            <option>Accesorios</option>
-                                            <option>Zapatos</option>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Costo Interno</label>
+                                        <input
+                                            required
+                                            type="number"
+                                            placeholder="0"
+                                            className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-purple-500/20 font-black transition-all"
+                                            value={newProduct.cost}
+                                            onChange={(e) => setNewProduct({ ...newProduct, cost: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Unidades (Stock)</label>
+                                        <input
+                                            required
+                                            type="number"
+                                            className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-purple-500/20 font-black transition-all"
+                                            value={newProduct.stock}
+                                            onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Categoría</label>
+                                        <select
+                                            className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-purple-500/20 font-black transition-all appearance-none"
+                                            value={newProduct.category}
+                                            onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                                        >
+                                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                     </div>
                                 </div>
+
                                 <div className="space-y-2">
-                                    <label className="text-[11px] font-black uppercase text-gray-400 ml-1">Descripción para Editorial IA</label>
-                                    <textarea required value={description} onChange={e => setDescription(e.target.value)} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white outline-none font-medium text-gray-600 h-28 resize-none" placeholder="Describe materiales y estilo para que la IA pose con este producto..." />
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Descripción del Producto</label>
+                                    <textarea
+                                        required
+                                        rows="4"
+                                        placeholder="Describe materiales, tallas y estilo..."
+                                        className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-purple-500/20 font-medium transition-all"
+                                        value={newProduct.description}
+                                        onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-2 px-1">La IA utilizará esta descripción para generar la sesión editorial automáticamente.</p>
                                 </div>
-
                             </div>
+                        </section>
 
-                            <div className="flex flex-col gap-6">
-                                <div className="border-2 border-dashed border-gray-100 rounded-[2rem] bg-gray-50 flex flex-col items-center justify-center relative group overflow-hidden min-h-[400px]">
-                                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                                    {imageFile ? (
-                                        <img src={imageFile} className="w-full h-full object-cover rounded-2xl" />
-                                    ) : (
-                                        <div className="text-center px-4">
-                                            <ImageIcon className="text-gray-300 mx-auto mb-2" size={32} />
-                                            <p className="font-bold text-xs text-gray-500 uppercase leading-tight">Cargar Foto del Producto</p>
-                                            <p className="text-[10px] text-gray-400 mt-2">La IA generará la sesión editorial automáticamente al publicar.</p>
+                        <section className="space-y-8">
+                            <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[400px] relative group overflow-hidden transition-all hover:border-purple-200">
+                                {newProduct.image ? (
+                                    <>
+                                        <img src={newProduct.image} alt="Preview" className="w-full h-full object-cover rounded-2xl absolute inset-0" />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+                                            <label className="cursor-pointer bg-white text-gray-900 px-6 py-3 rounded-xl font-black text-sm shadow-xl">Cambiar Foto</label>
                                         </div>
-                                    )}
-                                </div>
-
-                                <button type="submit" disabled={isSubmitting || !imageFile} className="w-full bg-black text-white py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 mt-auto flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-50">
-                                    {isSubmitting ? 'Publicando...' : <>Publicar Producto <ArrowRight size={18} /></>}
-                                </button>
+                                    </>
+                                ) : (
+                                    <label className="cursor-pointer flex flex-col items-center gap-4 group/label">
+                                        <div className="p-6 bg-gray-50 rounded-[2rem] group-hover/label:bg-purple-50 transition-colors">
+                                            <ImageIcon size={48} className="text-gray-300 group-hover/label:text-purple-400 transition-colors" />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="font-black text-gray-900 tracking-tighter uppercase text-sm">Cargar Foto del Producto</p>
+                                            <p className="text-[10px] text-gray-400 font-medium">La IA generará la sesión editorial automáticamente al publicar.</p>
+                                        </div>
+                                    </label>
+                                )}
+                                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
                             </div>
-                        </form>
-                    )
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-center py-20">
-                        <div className="bg-gray-100 p-8 rounded-full mb-6">
-                            <Database size={48} className="text-gray-300" />
-                        </div>
-                        <h3 className="text-2xl font-black text-gray-900">Módulo en Desarrollo</h3>
-                    </div>
+
+                            <button
+                                type="submit"
+                                disabled={isSubmitting || !newProduct.image}
+                                className={`w-full py-6 rounded-[2rem] font-black text-sm uppercase tracking-widest transition-all duration-500 flex items-center justify-center gap-3 ${newProduct.image
+                                        ? 'bg-gray-900 text-white shadow-2xl shadow-gray-200 hover:scale-[1.02] active:scale-95'
+                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    }`}
+                            >
+                                <span>{isSubmitting ? 'Publicando...' : 'Publicar Producto'}</span>
+                                {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <ArrowRight size={18} />}
+                            </button>
+                        </section>
+                    </form>
                 )}
-            </div>
-            {/* Toast Notifications */}
-            <div className="fixed bottom-10 right-10 z-[100] flex flex-col gap-3">
-                {toasts.map(toast => (
-                    <div
-                        key={toast.id}
-                        className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in slide-in-from-right-10 duration-500 ${toast.type === 'error' ? 'bg-red-50/90 border-red-100 text-red-600' : 'bg-white/90 border-gray-100 text-gray-900'
-                            }`}
-                    >
-                        {toast.type === 'error' ? <X size={18} /> : <CheckCircle size={18} className="text-green-500" />}
-                        <span className="text-sm font-bold">{toast.message}</span>
-                    </div>
-                ))}
             </div>
         </div>
     );
