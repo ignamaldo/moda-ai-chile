@@ -104,11 +104,17 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         const base64Data = imageFile.split(',')[1];
 
-        const prompt = `Actúa como un fotógrafo de alta costura para una revista de élite.
+        const prompt = `Actúa como un fotógrafo de alta costura para una revista de élite (como Vogue o Harper's Bazaar).
   OBJETIVO: Crear una imagen publicitaria de nivel editorial donde una modelo de alta costura viste el artículo de moda adjunto.
-  ARTÍCULO: ${name}.
-  DETALLES: ${description}.
-  ESTÉTICA: Fotografía nítida, de alto contraste, estudio profesional. La prenda debe integrarse perfectamente en el cuerpo de la modelo. fotorrealismo extremo.`;
+  
+  ARTÍCULO A RESALTAR: ${name} - ${description}.
+  
+  DETALLES DE LA COMPOSICIÓN:
+  - ESCENA: Un entorno minimalista y sofisticado (estudio profesional con iluminación 'chiaroscuro' o un fondo arquitectónico moderno y limpio).
+  - MODELO: Una persona con pose elegante, natural y profesional que luzca la prenda con confianza.
+  - ESTÉTICA: Fotografía nítida, de alto contraste, con texturas de tela realistas y detalles finos.
+  - INTEGRACIÓN: La prenda de la imagen adjunta debe integrarse perfectamente en el cuerpo de la modelo, respetando la caída, el material y el color original.
+  - CALIDAD: Resolución 4K, fotorrealismo extremo, sin distorsiones en manos o rostro.`;
 
         const payload = {
             contents: [{
