@@ -99,52 +99,68 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
         if (!apiKey || apiKey === "TU_GEMINI_API_KEY_AQUI") return;
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-        const base64DataData = base64Image.split(',')[1];
+        const base64Data = base64Image.split(',')[1];
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', docId);
 
-        const prompt = `Actúa como un fotógrafo de alta costura para una revista de élite (como Vogue o Harper's Bazaar).
-  OBJETIVO: Crear una imagen publicitaria de nivel editorial donde una modelo de alta costura viste el artículo de moda adjunto.
-  
-  ARTÍCULO A RESALTAR: ${productName} - ${productDesc}.
-  
-  DETALLES DE LA COMPOSICIÓN:
-  - ESCENA: Un entorno minimalista y sofisticado (estudio profesional con iluminación 'chiaroscuro' o un fondo arquitectónico moderno y limpio).
-  - MODELO: Una persona con pose elegante, natural y profesional que luzca la prenda con confianza.
-  - ESTÉTICA: Fotografía nítida, de alto contraste, con texturas de tela realistas y detalles finos.
-  - INTEGRACIÓN: La prenda de la imagen adjunta debe integrarse perfectamente en el cuerpo de la modelo, respetando la caída, el material y el color original.
-  - CALIDAD: Resolución 4K, fotorrealismo extremo, sin distorsiones en manos o rostro.`;
-
-        const payload = {
-            contents: [{
-                parts: [
-                    { text: prompt },
-                    { inlineData: { mimeType: "image/jpeg", data: base64DataData } }
-                ]
-            }]
-        };
+        // --- PHASE 1: MODEL PROMOTION ---
+        const modelPrompt = `Actúa como un fotógrafo de alta costura.
+  OBJETIVO: Crear una imagen publicitaria de nivel editorial donde una modelo de alta costura viste el artículo de moda adjunto para promocionarlo.
+  ARTÍCULO: ${productName} - ${productDesc}.
+  ESTÉTICA: Iluminación chiaroscuro, entorno minimalista sofisticado, fotorrealismo extremo, estilo Vogue.`;
 
         try {
-            const response = await fetch(url, {
+            const resModel = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: modelPrompt },
+                            { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+                        ]
+                    }]
+                })
             });
 
-            if (!response.ok) throw new Error("Error en Gemini");
-
-            const data = await response.json();
-            const aiBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-
-            if (aiBase64) {
-                const aiUrl = `data:image/jpeg;base64,${aiBase64}`;
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', docId), {
-                    aiImageUrl: aiUrl
-                });
-                addToast(`Sesión Editorial lista para "${productName}" ✨`);
+            if (resModel.ok) {
+                const data = await resModel.json();
+                const aiBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                if (aiBase64) {
+                    await updateDoc(docRef, { aiImageUrl: `data:image/jpeg;base64,${aiBase64}` });
+                    addToast(`Diseño con Modelo listo para "${productName}" 👗`);
+                }
             }
-        } catch (error) {
-            console.error("Background AI Error:", error);
-            addToast(`Error al generar IA para "${productName}"`, 'error');
-        }
+        } catch (e) { console.error("Model AI Error:", e); }
+
+        // --- PHASE 2: PRODUCT ONLY (HIGH QUALITY) ---
+        const productPrompt = `OBJETIVO: Crear una fotografía profesional del producto solo, sin modelos ni personas.
+  ESCENA: El producto está perfectamente dispuesto sobre una mesa de mármol o madera minimalista en un estudio fotográfico.
+  CALIDAD: Enfoque macro en texturas, visualización de alta calidad, iluminación de producto comercial nítida. 
+  ARTÍCULO: ${productName}.`;
+
+        try {
+            const resProd = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: productPrompt },
+                            { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+                        ]
+                    }]
+                })
+            });
+
+            if (resProd.ok) {
+                const data = await resProd.json();
+                const aiBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                if (aiBase64) {
+                    await updateDoc(docRef, { aiProductUrl: `data:image/jpeg;base64,${aiBase64}` });
+                    addToast(`Foto de Producto (Alta Calidad) lista para "${productName}" 📸`);
+                }
+            }
+        } catch (e) { console.error("Product AI Error:", e); }
     };
 
     const handleSubmit = async (e) => {
