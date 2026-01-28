@@ -2,21 +2,41 @@ import React from 'react';
 import { ShoppingBag, Trash2 } from 'lucide-react';
 
 const ProductCard = ({ product, onAddCart, isAdmin, onDelete, formatCLP }) => {
-    // Primary: Model IA -> Product IA -> Original
-    // Hover: Product IA -> Model IA -> Original
-    const primaryImage = product.aiImageUrl || product.aiProductUrl || product.imageUrl;
-    const hoverImage = product.aiProductUrl || product.aiImageUrl || product.imageUrl;
+    // For Admin: Show anything available
+    // For Customer: Show ONLY AI. If no AI, show placeholder/loading.
+    const primaryImage = isAdmin
+        ? (product.aiImageUrl || product.aiProductUrl || product.imageUrl)
+        : (product.aiImageUrl || product.aiProductUrl);
+
+    const hoverImage = isAdmin
+        ? (product.aiProductUrl || product.aiImageUrl || product.imageUrl)
+        : (product.aiProductUrl || product.aiImageUrl);
+
+    const hasAnyAI = product.aiImageUrl || product.aiProductUrl;
     const hasBothAI = product.aiImageUrl && product.aiProductUrl;
 
     return (
         <div className="bg-white rounded-[2rem] shadow-sm hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 border border-gray-100/50 flex flex-col h-full group overflow-hidden">
             <div className="relative h-80 overflow-hidden bg-gray-50 text-center">
                 {/* Image Layer: Primary */}
-                <img
-                    src={primaryImage || "https://via.placeholder.com/400x400?text=Sin+Imagen"}
-                    alt={product.name}
-                    className={`w-full h-full object-cover transition-all duration-1000 ${hasBothAI ? 'group-hover:opacity-0 group-hover:scale-105' : 'group-hover:scale-110'}`}
-                />
+                {primaryImage ? (
+                    <img
+                        src={primaryImage}
+                        alt={product.name}
+                        className={`w-full h-full object-cover transition-all duration-1000 ${hasBothAI ? 'group-hover:opacity-0 group-hover:scale-105' : 'group-hover:scale-110'}`}
+                    />
+                ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 border-2 border-dashed border-gray-100 p-8">
+                        <div className="relative">
+                            <Wand2 className="text-purple-400 animate-pulse mb-4" size={48} />
+                            <div className="absolute -top-1 -right-1">
+                                <Sparkles className="text-purple-300 animate-bounce" size={20} />
+                            </div>
+                        </div>
+                        <p className="text-[10px] font-black text-purple-600 uppercase tracking-[0.2em] animate-pulse">Generando Sesión IA...</p>
+                        <p className="text-[9px] text-gray-400 mt-2 font-medium">Espera unos segundos para <br /> ver el resultado final</p>
+                    </div>
+                )}
 
                 {/* Image Layer: Hover (Dual AI transition) */}
                 {hasBothAI && (
