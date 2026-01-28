@@ -36,15 +36,44 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
         { id: 'Impuestos', icon: Calculator },
     ];
 
+    const compressImage = (base64Str, maxWidth = 1024, maxHeight = 1024) => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = base64Str;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compresión al 70%
+            };
+        });
+    };
+
     const handleImageChange = (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            if (file.size > 800000) {
-                alert("La imagen excede los 800KB. Optimizada para demo.");
-                return;
-            }
             const reader = new FileReader();
-            reader.onloadend = () => setImageFile(reader.result);
+            reader.onloadend = async () => {
+                const compressed = await compressImage(reader.result);
+                setImageFile(compressed);
+            };
             reader.readAsDataURL(file);
         }
     };
@@ -88,8 +117,8 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`flex items-center gap-2.5 py-4 px-2 border-b-2 transition-all duration-300 ${isActive
-                                        ? 'border-black text-black'
-                                        : 'border-transparent text-gray-400 hover:text-gray-600'
+                                    ? 'border-black text-black'
+                                    : 'border-transparent text-gray-400 hover:text-gray-600'
                                     }`}
                             >
                                 <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
