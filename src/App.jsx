@@ -52,10 +52,11 @@ export default function App() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
 
+    const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+
     // Auth
     useEffect(() => {
         const initAuth = async () => {
-            // Simple anonymous auth for demo
             try {
                 await signInAnonymously(auth);
             } catch (error) {
@@ -69,6 +70,7 @@ export default function App() {
     // Fetch Data
     useEffect(() => {
         if (!user) return;
+        setIsLoadingProducts(true);
         try {
             const q = query(
                 collection(db, 'artifacts', appId, 'public', 'data', 'products'),
@@ -78,14 +80,16 @@ export default function App() {
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setProducts(items);
+                setIsLoadingProducts(false);
             }, (error) => {
                 console.error("Error fetching products:", error);
-                // Fallback UI or silent fail for demo if config is wrong
+                setIsLoadingProducts(false);
             });
 
             return () => unsubscribe();
         } catch (e) {
-            console.error("Firestore Error (check config):", e);
+            console.error("Firestore Error:", e);
+            setIsLoadingProducts(false);
         }
     }, [user]);
 
@@ -115,33 +119,35 @@ export default function App() {
     const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
 
     return (
-        <div className="min-h-screen bg-gray-50 font-sans text-gray-900 pb-20">
+        <div className="min-h-screen bg-white font-sans text-gray-900 pb-20 selection:bg-purple-100 selection:text-purple-900">
 
             {/* Navbar */}
-            <nav className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3">
-                <div className="max-w-6xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-black text-white p-1.5 rounded-lg">
-                            <ShoppingBag size={20} strokeWidth={2.5} />
+            <nav className="sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-gray-100 px-6 py-4">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-3 group cursor-pointer">
+                        <div className="bg-gray-950 text-white p-2.5 rounded-xl group-hover:bg-purple-600 transition-colors duration-500 shadow-xl shadow-gray-200">
+                            <ShoppingBag size={24} strokeWidth={2.5} />
                         </div>
-                        <h1 className="text-xl font-bold tracking-tight">Moda AI <span className="text-purple-600">Chile</span></h1>
+                        <h1 className="text-2xl font-black tracking-tighter flex items-center gap-2">
+                            MODA <span className="bg-purple-100 text-purple-600 px-2 py-0.5 rounded-lg text-lg">AI</span> ERP
+                        </h1>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-6">
                         <button
                             onClick={() => setIsAdminMode(!isAdminMode)}
-                            className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors ${isAdminMode ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                            className="text-[11px] px-6 py-2.5 rounded-xl font-bold transition-all duration-300 border border-gray-200 hover:bg-gray-50 text-gray-700 bg-white"
                         >
-                            {isAdminMode ? 'Modo Admin' : 'Modo Cliente'}
+                            {isAdminMode ? 'Vista Cliente' : 'Vista Admin ERP'}
                         </button>
 
                         <button
-                            className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            className="relative p-2.5 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all duration-300 group"
                             onClick={() => setIsCartOpen(!isCartOpen)}
                         >
-                            <ShoppingBag size={24} className="text-gray-700" />
+                            <ShoppingBag size={24} className="text-gray-800 group-hover:scale-110 transition-transform" />
                             {cart.length > 0 && (
-                                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
+                                <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full font-black shadow-lg border-2 border-white animate-in zoom-in">
                                     {cart.length}
                                 </span>
                             )}
@@ -151,49 +157,105 @@ export default function App() {
             </nav>
 
             {/* Main Content */}
-            <main className="max-w-6xl mx-auto p-4 mt-4">
+            <main className="max-w-7xl mx-auto p-6">
 
                 {/* Admin Section */}
-                {isAdminMode && user && (
-                    <div className="animate-in slide-in-from-top-4 duration-500">
-                        <AdminPanel user={user} db={db} appId={appId} />
+                {isAdminMode && (
+                    <div className="animate-in slide-in-from-top-10 duration-700 fade-in">
+                        {user ? (
+                            <AdminPanel
+                                user={user}
+                                db={db}
+                                appId={appId}
+                                products={products}
+                                onDelete={deleteProduct}
+                                formatCLP={formatCLP}
+                            />
+                        ) : (
+                            <div className="bg-amber-50 border border-amber-200 p-8 rounded-[2.5rem] text-center mb-12">
+                                <div className="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Wand2 className="text-amber-600 animate-pulse" />
+                                </div>
+                                <h3 className="text-lg font-black text-amber-900">Autenticando con Firebase...</h3>
+                                <p className="text-amber-700/70 text-sm mt-2 max-w-md mx-auto">
+                                    Si esto tarda mucho, asegúrate de haber activado el **"Anonymous Sign-in"** en la pestaña de Authentication de tu consola de Firebase.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* Hero Section (Only visible for customers) */}
+                {/* Hero Section */}
                 {!isAdminMode && (
-                    <div className="mb-10 text-center py-10 bg-gradient-to-r from-purple-900 to-indigo-900 rounded-2xl text-white shadow-xl px-6 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-full opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                        <h2 className="text-3xl md:text-5xl font-extrabold mb-4 relative z-10">Viste el Futuro</h2>
-                        <p className="text-lg text-purple-100 max-w-2xl mx-auto mb-6 relative z-10">La primera tienda en Chile donde puedes usar Inteligencia Artificial para ver cómo lucen nuestros productos en modelos profesionales al instante.</p>
-                        <div className="flex justify-center gap-4 relative z-10">
-                            <span className="flex items-center gap-1 text-xs font-bold bg-white/10 backdrop-blur px-3 py-1 rounded-full border border-white/20"><CreditCard size={12} /> WebPay</span>
-                            <span className="flex items-center gap-1 text-xs font-bold bg-white/10 backdrop-blur px-3 py-1 rounded-full border border-white/20"><Wand2 size={12} /> IA Styling</span>
+                    <div className="mb-16 text-center py-28 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-950 via-purple-950 to-black rounded-[3rem] text-white shadow-[0_40px_100px_-20px_rgba(88,28,135,0.3)] px-8 relative overflow-hidden border border-white/5">
+                        <div className="absolute top-0 left-0 w-full h-full opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] animate-slow-scroll"></div>
+                        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-[120px] -mr-40 -mt-20"></div>
+                        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-600/20 rounded-full blur-[100px] -ml-20 -mb-20"></div>
+
+                        <div className="relative z-10 max-w-4xl mx-auto">
+                            <span className="inline-flex items-center gap-2 px-5 py-2 mb-8 text-[10px] font-black tracking-[0.3em] uppercase bg-white/5 backdrop-blur-xl rounded-full border border-white/10 text-purple-300 shadow-2xl">
+                                <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></span>
+                                Powered by Gemini 1.5 Flash
+                            </span>
+                            <h2 className="text-6xl md:text-8xl font-black mb-8 tracking-tighter leading-[0.9] text-white">
+                                Redefine tu <br />
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-300">Estilo Personal</span>
+                            </h2>
+                            <p className="text-lg md:text-xl text-purple-100/60 mb-12 leading-relaxed font-medium max-w-2xl mx-auto">
+                                La primera plataforma en Chile que permite visualizar colecciones exclusivas en modelos fotorrealistas con Inteligencia Artificial.
+                            </p>
+                            <div className="flex flex-wrap justify-center gap-4">
+                                <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 hover:bg-white/10 transition-all duration-300 group cursor-pointer shadow-xl">
+                                    <div className="bg-purple-500/20 p-2 rounded-xl text-purple-300 group-hover:scale-110 transition-transform"><Wand2 size={20} /></div>
+                                    <span className="text-xs font-black uppercase tracking-widest">IA Fashion Studio</span>
+                                </div>
+                                <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 hover:bg-white/10 transition-all duration-300 group cursor-pointer shadow-xl">
+                                    <div className="bg-blue-500/20 p-2 rounded-xl text-blue-300 group-hover:scale-110 transition-transform"><CreditCard size={20} /></div>
+                                    <span className="text-xs font-black uppercase tracking-widest">WebPay Integration</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* Product Grid */}
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800">Catálogo Reciente</h2>
-                    <div className="flex gap-2">
-                        {['Todos', 'Ropa', 'Carteras'].map(cat => (
-                            <button key={cat} className="px-3 py-1 rounded-full text-sm border border-gray-200 hover:border-black hover:bg-black hover:text-white transition-all">
+                {/* Product Grid Header */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-10 gap-6">
+                    <div>
+                        <h2 className="text-3xl font-black text-gray-900 tracking-tight">Colección 2026</h2>
+                        <p className="text-gray-400 text-sm font-medium mt-1">Explora nuestras piezas seleccionadas</p>
+                    </div>
+                    <div className="flex bg-gray-100 p-1.5 rounded-2xl gap-1">
+                        {['Todos', 'Ropa', 'Accesorios', 'Zapatos'].map(cat => (
+                            <button key={cat} className={`px-5 py-2 rounded-[0.9rem] text-xs font-black transition-all duration-300 uppercase tracking-wider ${cat === 'Todos' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
                                 {cat}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                {products.length === 0 ? (
-                    <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300">
-                        <ShoppingBag size={48} className="mx-auto text-gray-300 mb-4" />
-                        <p className="text-gray-500">No hay productos aún.</p>
-                        <p className="text-xs text-gray-400 mt-2">(Asegúrate de configurar firebaseConfig.js correctamente)</p>
-                        {isAdminMode && <p className="text-sm text-blue-500 mt-2">¡Agrega tu primer producto arriba!</p>}
+                {isLoadingProducts ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="animate-pulse">
+                                <div className="bg-gray-100 aspect-square rounded-[2rem] mb-4"></div>
+                                <div className="h-4 bg-gray-100 rounded w-2/3 mb-2"></div>
+                                <div className="h-4 bg-gray-100 rounded w-1/2"></div>
+                            </div>
+                        ))}
+                    </div>
+                ) : products.length === 0 ? (
+                    <div className="text-center py-32 bg-gray-50/50 rounded-[3rem] border-2 border-dashed border-gray-100">
+                        <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+                            <ShoppingBag size={40} className="text-gray-200" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800">No hay piezas disponibles</h3>
+                        <p className="text-gray-400 mt-2 max-w-xs mx-auto text-sm">Pronto tendremos nuevas llegadas. Si eres admin, puedes agregar productos ahora.</p>
+                        {isAdminMode && (
+                            <button className="mt-8 px-8 py-3 bg-purple-600 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-purple-100">Agregar Producto</button>
+                        )}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 animate-in fade-in slide-in-from-bottom-5 duration-1000">
                         {products.map(product => (
                             <ProductCard
                                 key={product.id}

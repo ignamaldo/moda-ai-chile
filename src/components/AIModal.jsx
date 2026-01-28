@@ -9,16 +9,20 @@ const generateModelImage = async (productImageBase64, productDescription) => {
         throw new Error("Falta configurar la GEMINI_API_KEY en firebaseConfig.js");
     }
 
-    // Usamos el modelo capaz de editar/entender imagen para generar una nueva basada en el contexto
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+    // Usamos gemini-1.5-flash ya que es rápido y soporta imagen + texto
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    const prompt = `Actúa como un fotógrafo de moda profesional. 
-  Genera una imagen fotorrealista de una modelo (mujer u hombre según corresponda al producto) vistiendo el siguiente artículo de moda.
+    const prompt = `Actúa como un fotógrafo de alta costura para una revista de élite (como Vogue o Harper's Bazaar).
+  OBJETIVO: Crear una imagen publicitaria de nivel editorial donde una modelo de alta costura viste el artículo de moda adjunto.
   
-  El artículo es: ${productDescription}.
+  ARTÍCULO A RESALTAR: ${productDescription}.
   
-  La imagen debe parecer una fotografía de estudio de alta calidad para una tienda de ropa online (e-commerce). 
-  Asegúrate de que la prenda se vea claramente y sea el foco principal. Fondo neutro o urbano desenfocado.`;
+  DETALLES DE LA COMPOSICIÓN:
+  - ESCENA: Un entorno minimalista y sofisticado (estudio profesional con iluminación 'chiaroscuro' o un fondo arquitectónico moderno y limpio).
+  - MODELO: Una persona con pose elegante, natural y profesional que luzca la prenda con confianza.
+  - ESTÉTICA: Fotografía nítida, de alto contraste, con texturas de tela realistas y detalles finos.
+  - INTEGRACIÓN: La prenda de la imagen adjunta debe integrarse perfectamente en el cuerpo de la modelo, respetando la caída, el material y el color original.
+  - CALIDAD: Resolución 4K, fotorrealismo extremo, sin distorsiones en manos o rostro.`;
 
     const payload = {
         contents: [{
@@ -31,10 +35,7 @@ const generateModelImage = async (productImageBase64, productDescription) => {
                     }
                 }
             ]
-        }],
-        generationConfig: {
-            responseModalities: ["IMAGE"], // Forzamos respuesta de imagen si el modelo lo soporta, o texto+imagen
-        }
+        }]
     };
 
     try {
@@ -49,14 +50,11 @@ const generateModelImage = async (productImageBase64, productDescription) => {
         const data = await response.json();
 
         // Extraer la imagen base64 de la respuesta
-        // Nota: La estructura de respuesta puede variar según la versión de la API y modelo
-        // Ajustar según la respuesta real de Gemini Vision
         const imageBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
 
         if (imageBase64) {
             return `data:image/jpeg;base64,${imageBase64}`;
         } else {
-            // Si no devuelve imagen directa, puede que devuelva texto o haya fallado
             throw new Error('No se generó imagen. Intenta describir mejor el producto.');
         }
     } catch (error) {
@@ -77,24 +75,39 @@ const AIModal = ({ isOpen, onClose, product }) => {
         }
     }, [isOpen]);
 
+    const loadingMessages = [
+        "Analizando el estilo del producto...",
+        "Diseñando sesión de fotos virtual...",
+        "Ajustando la iluminación de estudio...",
+        "Posicionando modelo profesional...",
+        "Generando resultado final..."
+    ];
+
+    const [loadingMessageIdx, setLoadingMessageIdx] = useState(0);
+
+    useEffect(() => {
+        let interval;
+        if (loading) {
+            interval = setInterval(() => {
+                setLoadingMessageIdx(prev => (prev + 1) % loadingMessages.length);
+            }, 2000);
+        }
+        return () => clearInterval(interval);
+    }, [loading]);
+
     const handleGenerate = async () => {
         if (!product) return;
         setLoading(true);
         setError(null);
+        setLoadingMessageIdx(0);
 
         try {
-            // Necesitamos convertir la URL de la imagen a base64 (limpio) para enviarla a Gemini
-            // Nota: Esto funciona mejor si la imagen ya está en base64 en la BD, 
-            // si es una URL externa puede haber problemas de CORS.
-
             let base64Image = "";
 
             if (product.imageUrl.startsWith('data:image')) {
                 base64Image = product.imageUrl.split(',')[1];
             } else {
-                // Fallback para demo: no podemos descargar imágenes externas por CORS en iframe fácilmente
-                // En producción, esto se haría via proxy o backend function
-                throw new Error("Para usar la IA en esta demo, sube una imagen real desde tu dispositivo en el panel de admin (no una URL externa), para tener el base64 local.");
+                throw new Error("Para usar la IA, sube una imagen real desde el panel de admin para procesar los datos locales.");
             }
 
             const result = await generateModelImage(base64Image, `${product.name} - ${product.description}`);
@@ -110,12 +123,12 @@ const AIModal = ({ isOpen, onClose, product }) => {
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="p-4 border-b flex justify-between items-center bg-purple-50">
+            <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
+                <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-purple-50 to-indigo-50">
                     <h2 className="text-lg font-bold text-purple-900 flex items-center gap-2">
-                        <Wand2 className="text-purple-600" size={20} /> Estudio Virtual con IA
+                        <Wand2 className="text-purple-600 animate-pulse" size={20} /> Estudio de Estilo IA
                     </h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 p-1">
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-800 p-1 transition-colors">
                         <X size={24} />
                     </button>
                 </div>
@@ -124,30 +137,35 @@ const AIModal = ({ isOpen, onClose, product }) => {
                     <div className="flex flex-col md:flex-row gap-6">
                         {/* Input Product */}
                         <div className="flex-1">
-                            <h3 className="text-sm font-semibold text-gray-500 mb-2">Producto Original</h3>
-                            <div className="rounded-lg overflow-hidden border border-gray-200 aspect-square relative bg-gray-50">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Producto Original</h3>
+                            <div className="rounded-xl overflow-hidden border border-gray-100 aspect-square relative bg-gray-50 shadow-inner">
                                 <img src={product?.imageUrl} className="w-full h-full object-cover" alt="Producto" />
                             </div>
-                            <p className="mt-2 text-sm text-gray-600">{product?.name}</p>
+                            <p className="mt-3 text-sm font-semibold text-gray-800">{product?.name}</p>
                         </div>
 
                         {/* Output Model */}
                         <div className="flex-1">
-                            <h3 className="text-sm font-semibold text-purple-600 mb-2">Modelo Generado por IA</h3>
-                            <div className="rounded-lg overflow-hidden border-2 border-dashed border-purple-200 aspect-square relative bg-purple-50 flex items-center justify-center">
+                            <h3 className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-3">Vista Previa con IA</h3>
+                            <div className="rounded-xl overflow-hidden border-2 border-dashed border-purple-100 aspect-square relative bg-purple-50/30 flex items-center justify-center shadow-inner">
                                 {loading ? (
-                                    <div className="text-center p-4">
-                                        <Loader2 className="animate-spin text-purple-600 mx-auto mb-2" size={32} />
-                                        <p className="text-xs text-purple-600 font-medium">Diseñando sesión de fotos...</p>
+                                    <div className="text-center p-6 bg-white/50 backdrop-blur-sm rounded-2xl shadow-xl">
+                                        <Loader2 className="animate-spin text-purple-600 mx-auto mb-3" size={40} />
+                                        <p className="text-sm text-purple-700 font-bold animate-pulse">{loadingMessages[loadingMessageIdx]}</p>
                                     </div>
                                 ) : generatedImage ? (
-                                    <img src={generatedImage} className="w-full h-full object-cover animate-in fade-in" alt="IA Generada" />
+                                    <img src={generatedImage} className="w-full h-full object-cover animate-in fade-in zoom-in-110 duration-1000" alt="IA Generada" />
                                 ) : error ? (
-                                    <div className="text-center p-4 text-red-500 text-sm">{error}</div>
+                                    <div className="text-center p-6 text-red-500 text-sm bg-red-50 w-full h-full flex flex-col items-center justify-center">
+                                        <X size={32} className="mb-2 opacity-50" />
+                                        <p className="font-medium px-4">{error}</p>
+                                    </div>
                                 ) : (
-                                    <div className="text-center p-4 text-gray-400">
-                                        <Camera size={32} className="mx-auto mb-2 opacity-50" />
-                                        <p className="text-xs">Pulsa generar para ver a una modelo con este producto</p>
+                                    <div className="text-center p-8 text-gray-400 group cursor-pointer" onClick={handleGenerate}>
+                                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                                            <Camera size={32} className="opacity-30 group-hover:opacity-60 transition-opacity" />
+                                        </div>
+                                        <p className="text-xs font-medium max-w-[150px] mx-auto">Pulsa 'Generar' para ver a una modelo profesional con este producto</p>
                                     </div>
                                 )}
                             </div>
