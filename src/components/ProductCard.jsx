@@ -63,14 +63,6 @@ const ProductCard = ({ product, onAddCart, isAdmin, onDelete, formatCLP }) => {
                     <div className="bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/40 shadow-sm transition-all group-hover:bg-white/60">
                         <span className="text-[10px] font-extrabold text-gray-800 uppercase tracking-widest">{product.category || 'Destacado'}</span>
                     </div>
-
-                    {/* AI Generation Badge (Customer View Only) */}
-                    {!isAdmin && isGeneratingAI && (
-                        <div className="bg-purple-500/90 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-purple-400/40 shadow-lg flex items-center gap-1.5 animate-pulse">
-                            <Wand2 size={12} className="text-white" />
-                            <span className="text-[9px] font-black text-white uppercase tracking-tight">IA Generando...</span>
-                        </div>
-                    )}
                 </div>
 
                 {isAdmin && (

@@ -108,6 +108,9 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
         const base64Data = base64Image.split(',')[1];
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', docId);
 
+        let aiImageUrl = null;
+        let aiProductUrl = null;
+
         // --- PHASE 1: MODEL PROMOTION ---
         const modelPrompt = `Actúa como un fotógrafo de alta costura.
   OBJETIVO: Crear una imagen publicitaria de nivel editorial donde una modelo de alta costura viste el artículo de moda adjunto para promocionarlo.
@@ -132,7 +135,8 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                 const data = await resModel.json();
                 const aiBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                 if (aiBase64) {
-                    await updateDoc(docRef, { aiImageUrl: `data:image/jpeg;base64,${aiBase64}` });
+                    aiImageUrl = `data:image/jpeg;base64,${aiBase64}`;
+                    await updateDoc(docRef, { aiImageUrl });
                     addToast(`Diseño con Modelo listo para "${productName}" 👗`);
                 }
             }
@@ -162,11 +166,18 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                 const data = await resProd.json();
                 const aiBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                 if (aiBase64) {
-                    await updateDoc(docRef, { aiProductUrl: `data:image/jpeg;base64,${aiBase64}` });
+                    aiProductUrl = `data:image/jpeg;base64,${aiBase64}`;
+                    await updateDoc(docRef, { aiProductUrl });
                     addToast(`Foto de Producto (Alta Calidad) lista para "${productName}" 📸`);
                 }
             }
         } catch (e) { console.error("Product AI Error:", e); }
+
+        // --- AUTO-PUBLISH: When both AI images are ready ---
+        if (aiImageUrl && aiProductUrl) {
+            await updateDoc(docRef, { status: 'published' });
+            addToast(`✅ "${productName}" publicado automáticamente`, 'success');
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -184,17 +195,20 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                 imageUrl: newProduct.image,
                 aiImageUrl: null,
                 aiProductUrl: null,
+                status: 'processing', // Start as processing
                 createdAt: serverTimestamp(),
                 createdBy: user.uid
             };
 
             const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), productData);
 
-            addToast("Producto publicado con éxito 🚀");
+            addToast("🔄 Producto en cola de procesamiento IA");
+
+            // Process AI generation in background
             processAIGeneration(docRef.id, newProduct.name, newProduct.description, newProduct.image);
 
             setNewProduct({ name: '', price: '', cost: '', stock: '1', category: 'Ropa', description: '', image: null });
-            setActiveTab('Lista');
+            setActiveTab('Dashboard');
         } catch (error) {
             console.error(error);
             addToast("Error al publicar producto", "error");
@@ -296,19 +310,19 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
                                 <AlertCircle className="text-red-500 mb-2" size={24} />
                             </div>
                         </div>
-                        <button
-                            onClick={handleGenerateDemoData}
-                            disabled={isGeneratingDemo}
-                            className="bg-purple-600 p-8 rounded-[2.5rem] shadow-lg shadow-purple-200 text-left hover:bg-purple-700 transition-all group overflow-hidden relative"
-                        >
+                        <div className="bg-gradient-to-br from-purple-600 to-indigo-600 p-8 rounded-[2.5rem] shadow-lg shadow-purple-200 relative overflow-hidden">
                             <div className="relative z-10">
-                                <span className="text-[10px] font-black text-purple-200 uppercase tracking-widest block mb-4">Herramientas</span>
-                                <span className="text-2xl font-black text-white tracking-tighter leading-none block">
-                                    {isGeneratingDemo ? 'Generando...' : 'Poblar Datos Demo'}
-                                </span>
+                                <span className="text-[10px] font-black text-purple-200 uppercase tracking-widest block mb-4">Cola de Procesamiento</span>
+                                <div className="flex items-end gap-3">
+                                    <span className="text-5xl font-black text-white tracking-tighter">
+                                        {products.filter(p => p.status === 'processing').length}
+                                    </span>
+                                    <Loader2 className="text-purple-300 mb-2 animate-spin" size={24} />
+                                </div>
+                                <p className="text-purple-100 text-xs mt-3 font-medium">Productos generando IA</p>
                             </div>
                             <Sparkles className="absolute -bottom-4 -right-4 text-purple-400/30 group-hover:scale-150 transition-transform duration-700" size={120} />
-                        </button>
+                        </div>
                     </div>
                 )}
 

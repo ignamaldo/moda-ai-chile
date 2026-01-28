@@ -260,7 +260,13 @@ export default function App() {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 animate-in fade-in slide-in-from-bottom-5 duration-1000">
                         {products
-                            .filter(p => selectedCategory === 'Todos' || p.category === selectedCategory)
+                            .filter(p => {
+                                // Category filter
+                                const matchesCategory = selectedCategory === 'Todos' || p.category === selectedCategory;
+                                // Status filter: customers only see published, admins see all
+                                const matchesStatus = isAdminMode || p.status === 'published';
+                                return matchesCategory && matchesStatus;
+                            })
                             .map(product => (
                                 <ProductCard
                                     key={product.id}
