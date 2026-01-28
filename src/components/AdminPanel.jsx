@@ -102,8 +102,14 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
 
     const processAIGeneration = async (docId, productName, productDesc, base64Image) => {
         const apiKey = GEMINI_API_KEY;
-        if (!apiKey || apiKey === "TU_GEMINI_API_KEY_AQUI") return;
+        if (!apiKey || apiKey === "TU_GEMINI_API_KEY_AQUI") {
+            console.warn("⚠️ Gemini API key not configured. Skipping AI generation.");
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', docId);
+            await updateDoc(docRef, { status: 'published' });
+            return;
+        }
 
+        console.log(`🎨 Starting AI generation for "${productName}"...`);
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         const base64Data = base64Image.split(',')[1];
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', docId);
@@ -118,6 +124,7 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
   ESTÉTICA: Iluminación chiaroscuro, entorno minimalista sofisticado, fotorrealismo extremo, estilo Vogue.`;
 
         try {
+            console.log("📸 Phase 1: Generating model image...");
             const resModel = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -133,14 +140,25 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
 
             if (resModel.ok) {
                 const data = await resModel.json();
+                console.log("✅ Model API response received");
                 const aiBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                 if (aiBase64) {
                     aiImageUrl = `data:image/jpeg;base64,${aiBase64}`;
                     await updateDoc(docRef, { aiImageUrl });
                     addToast(`Diseño con Modelo listo para "${productName}" 👗`);
+                    console.log("✅ Model image saved to Firestore");
+                } else {
+                    console.warn("⚠️ No image data in model response:", data);
                 }
+            } else {
+                const errorText = await resModel.text();
+                console.error("❌ Model API error:", resModel.status, errorText);
+                addToast(`Error generando imagen con modelo: ${resModel.status}`, "error");
             }
-        } catch (e) { console.error("Model AI Error:", e); }
+        } catch (e) {
+            console.error("❌ Model AI Error:", e);
+            addToast("Error en generación de imagen con modelo", "error");
+        }
 
         // --- PHASE 2: PRODUCT ONLY (HIGH QUALITY) ---
         const productPrompt = `OBJETIVO: Crear una fotografía profesional del producto solo, sin modelos ni personas.
@@ -149,6 +167,7 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
   ARTÍCULO: ${productName}.`;
 
         try {
+            console.log("📦 Phase 2: Generating product image...");
             const resProd = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -164,19 +183,39 @@ const AdminPanel = ({ user, db, appId, products, onDelete, formatCLP }) => {
 
             if (resProd.ok) {
                 const data = await resProd.json();
+                console.log("✅ Product API response received");
                 const aiBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                 if (aiBase64) {
                     aiProductUrl = `data:image/jpeg;base64,${aiBase64}`;
                     await updateDoc(docRef, { aiProductUrl });
                     addToast(`Foto de Producto (Alta Calidad) lista para "${productName}" 📸`);
+                    console.log("✅ Product image saved to Firestore");
+                } else {
+                    console.warn("⚠️ No image data in product response:", data);
                 }
+            } else {
+                const errorText = await resProd.text();
+                console.error("❌ Product API error:", resProd.status, errorText);
+                addToast(`Error generando foto de producto: ${resProd.status}`, "error");
             }
-        } catch (e) { console.error("Product AI Error:", e); }
+        } catch (e) {
+            console.error("❌ Product AI Error:", e);
+            addToast("Error en generación de foto de producto", "error");
+        }
 
-        // --- AUTO-PUBLISH: When both AI images are ready ---
+        // --- AUTO-PUBLISH: When both AI images are ready OR after attempts ---
         if (aiImageUrl && aiProductUrl) {
             await updateDoc(docRef, { status: 'published' });
             addToast(`✅ "${productName}" publicado automáticamente`, 'success');
+            console.log(`✅ Product "${productName}" published with AI images`);
+        } else if (aiImageUrl || aiProductUrl) {
+            await updateDoc(docRef, { status: 'published' });
+            addToast(`⚠️ "${productName}" publicado con imágenes parciales`, 'success');
+            console.log(`⚠️ Product "${productName}" published with partial AI images`);
+        } else {
+            await updateDoc(docRef, { status: 'published' });
+            addToast(`⚠️ "${productName}" publicado sin IA (revisa consola)`, 'success');
+            console.warn(`⚠️ Product "${productName}" published without AI images`);
         }
     };
 
