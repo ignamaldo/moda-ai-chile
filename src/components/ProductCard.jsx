@@ -1,78 +1,56 @@
 import React from 'react';
-import { ShoppingBag, Trash2, Sparkles, ImageIcon } from 'lucide-react';
+import { ShoppingBag, Trash2 } from 'lucide-react';
 
 const ProductCard = ({ product, onAddCart, isAdmin, onDelete, formatCLP }) => {
-    const [view, setView] = React.useState('aiModel'); // 'aiModel', 'aiProduct', 'original'
-
-    const getImageUrl = () => {
-        if (view === 'aiModel') return product.aiImageUrl || product.imageUrl;
-        if (view === 'aiProduct') return product.aiProductUrl || product.imageUrl;
-        return product.imageUrl;
-    };
+    // Primary: Model IA -> Product IA -> Original
+    // Hover: Product IA -> Model IA -> Original
+    const primaryImage = product.aiImageUrl || product.aiProductUrl || product.imageUrl;
+    const hoverImage = product.aiProductUrl || product.aiImageUrl || product.imageUrl;
+    const hasBothAI = product.aiImageUrl && product.aiProductUrl;
 
     return (
         <div className="bg-white rounded-[2rem] shadow-sm hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 border border-gray-100/50 flex flex-col h-full group overflow-hidden">
-            <div className="relative h-80 overflow-hidden bg-gray-50">
-                {/* Main Image Display */}
+            <div className="relative h-80 overflow-hidden bg-gray-50 text-center">
+                {/* Image Layer: Primary */}
                 <img
-                    src={getImageUrl() || "https://via.placeholder.com/400x400?text=Sin+Imagen"}
+                    src={primaryImage || "https://via.placeholder.com/400x400?text=Sin+Imagen"}
                     alt={product.name}
-                    className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105"
+                    className={`w-full h-full object-cover transition-all duration-1000 ${hasBothAI ? 'group-hover:opacity-0 group-hover:scale-105' : 'group-hover:scale-110'}`}
                 />
 
-                {/* View Selector (Glassmorphism Buttons) */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/20 backdrop-blur-md p-1 rounded-2xl border border-white/10 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-2 group-hover:translate-y-0 z-20">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setView('aiModel'); }}
-                        className={`px-3 py-1 rounded-xl text-[8px] font-black uppercase tracking-tighter transition-all ${view === 'aiModel' ? 'bg-white text-black shadow-lg' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
-                    >
-                        Modelo IA
-                    </button>
-                    {product.aiProductUrl && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setView('aiProduct'); }}
-                            className={`px-3 py-1 rounded-xl text-[8px] font-black uppercase tracking-tighter transition-all ${view === 'aiProduct' ? 'bg-white text-black shadow-lg' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
-                        >
-                            Producto IA
-                        </button>
-                    )}
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setView('original'); }}
-                        className={`px-3 py-1 rounded-xl text-[8px] font-black uppercase tracking-tighter transition-all ${view === 'original' ? 'bg-white text-black shadow-lg' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
-                    >
-                        Real
-                    </button>
+                {/* Image Layer: Hover (Dual AI transition) */}
+                {hasBothAI && (
+                    <img
+                        src={hoverImage}
+                        alt={`${product.name} detalle`}
+                        className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-all duration-1000 scale-110 group-hover:scale-100"
+                    />
+                )}
+
+                {/* Status Indicator (Subtle) */}
+                <div className="absolute bottom-4 left-0 right-0 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-2 group-hover:translate-y-0 text-center pointer-events-none">
+                    <span className="bg-black/40 backdrop-blur-md text-white/90 text-[8px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-full border border-white/10">
+                        {product.aiProductUrl ? 'Vista: Detalle Premium' : 'Vista: Diseño IA'}
+                    </span>
                 </div>
 
-                {/* Badges */}
+                {/* Category Badge */}
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
                     <div className="bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/40 shadow-sm transition-all group-hover:bg-white/60">
                         <span className="text-[10px] font-extrabold text-gray-800 uppercase tracking-widest">{product.category || 'Destacado'}</span>
                     </div>
-                    {product.aiImageUrl && view === 'aiModel' && (
-                        <div className="bg-purple-600/80 backdrop-blur-md px-3 py-1 rounded-2xl border border-purple-400/40 shadow-lg flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 duration-500">
-                            <Sparkles size={10} className="text-white" />
-                            <span className="text-[8px] font-black text-white uppercase tracking-tighter">Promoción IA</span>
-                        </div>
-                    )}
-                    {product.aiProductUrl && view === 'aiProduct' && (
-                        <div className="bg-indigo-600/80 backdrop-blur-md px-3 py-1 rounded-2xl border border-indigo-400/40 shadow-lg flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 duration-500">
-                            <ImageIcon size={10} className="text-white" />
-                            <span className="text-[8px] font-black text-white uppercase tracking-tighter">Detalle Premium</span>
-                        </div>
-                    )}
                 </div>
 
                 {isAdmin && (
                     <button
-                        onClick={() => onDelete(product.id)}
+                        onClick={(e) => { e.stopPropagation(); onDelete(product.id); }}
                         className="absolute top-4 right-4 bg-white/20 hover:bg-red-500 text-gray-800 hover:text-white p-2.5 rounded-2xl shadow-lg backdrop-blur-md border border-white/40 transition-all duration-300 z-20"
                     >
                         <Trash2 size={16} />
                     </button>
                 )}
 
-                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             </div>
 
             <div className="p-6 flex flex-col flex-grow bg-white relative">
@@ -98,6 +76,5 @@ const ProductCard = ({ product, onAddCart, isAdmin, onDelete, formatCLP }) => {
         </div>
     );
 };
-
 
 export default ProductCard;
